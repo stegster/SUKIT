@@ -14,7 +14,7 @@ def get_data():
 
 def update_sheet(df):
     # Pushes the new results back to the shared sheet
-    conn.update(data=df)
+    conn.update(worksheet="Sheet1", data=df)
     st.cache_data.clear()
 
 st.title("🏆 Steger Ultimate Kubb Invitational")
