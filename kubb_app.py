@@ -1,7 +1,8 @@
 import streamlit as st
 import pandas as pd
 
-st.set_page_config(page_title="Steger Ultimate Kubb Invitational Tournament", layout="wide")
+# Updated Page Title
+st.set_page_config(page_title="Steger Ultimate Kubb Invitational", layout="wide")
 
 # --- APP STATE MANAGEMENT ---
 if 'teams' not in st.session_state:
@@ -9,7 +10,8 @@ if 'teams' not in st.session_state:
 if 'matches' not in st.session_state:
     st.session_state.matches = None
 
-st.title("🏆 Kubb Tournament Manager")
+# Updated Main Header
+st.title("🏆 Steger Ultimate Kubb Invitational Tournament")
 
 # --- STEP 1: TEAM ENTRY ---
 with st.sidebar:
@@ -23,12 +25,10 @@ with st.sidebar:
             st.session_state.teams = teams
             
             # --- CIRCLE ROTATION SCHEDULER ---
-            # Guarantees even spacing and no repeat matchups
             n = len(teams)
             t_list = list(teams)
             all_possible_rounds = []
             
-            # Generate total rounds using circle method
             for r in range(n - 1):
                 round_matches = []
                 for i in range(n // 2):
@@ -36,21 +36,13 @@ with st.sidebar:
                     t2 = t_list[n - 1 - i]
                     round_matches.append((t1, t2))
                 all_possible_rounds.append(round_matches)
-                # Rotate everyone except the first team
                 t_list = [t_list[0]] + [t_list[-1]] + t_list[1:-1]
 
-            # We only need the first 3 rounds for your tournament
             selected_rounds = all_possible_rounds[:3]
             
             scheduled_data = []
-            match_idx = 1
             for r_idx, round_matches in enumerate(selected_rounds):
-                # We have 2 courts, so we split the round's matches
-                # If 16 teams, 8 matches per 'circle round'. 
-                # We spread them across time slots.
                 for m_idx, (ta, tb) in enumerate(round_matches):
-                    # Logical Round = Time Slot. 
-                    # With 2 courts, we play 2 matches per 'Time Slot'
                     time_slot = (r_idx * (n // 2) + m_idx) // 2 + 1
                     court_num = (m_idx % 2) + 1
                     scheduled_data.append({
@@ -71,7 +63,6 @@ with tab1:
     if st.session_state.matches is not None:
         st.header("Match Schedule")
         df = st.session_state.matches
-        # Group by Time Slot to show what's happening 'Now'
         for slot, slot_df in df.groupby("Time Slot"):
             st.subheader(f"Round {slot}")
             cols = st.columns(2)
@@ -114,7 +105,6 @@ with tab3:
             standings = pd.DataFrame(results).sort_values(by="W", ascending=False).head(8)
             top_8 = standings['Team'].tolist()
             
-            # Standard Seeding: 1v8, 4v5, 2v7, 3v6
             col1, col2 = st.columns(2)
             qf = [(0,7), (3,4), (1,6), (2,5)]
             for i, (p1, p2) in enumerate(qf):
