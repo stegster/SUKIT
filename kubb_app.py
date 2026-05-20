@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 
-st.set_page_config(page_title="Kubb Tournament Manager", layout="wide")
+st.set_page_config(page_title="Steger Ultimate Kubb Invitational Tournament", layout="wide")
 
 # --- APP STATE MANAGEMENT ---
 if 'teams' not in st.session_state:
