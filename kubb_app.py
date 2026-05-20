@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import random
 
 st.set_page_config(page_title="Kubb Tournament Manager", layout="wide")
 
@@ -9,8 +8,6 @@ if 'teams' not in st.session_state:
     st.session_state.teams = []
 if 'matches' not in st.session_state:
     st.session_state.matches = None
-if 'bracket' not in st.session_state:
-    st.session_state.bracket = None
 
 st.title("🏆 Kubb Tournament Manager")
 
@@ -18,38 +15,54 @@ st.title("🏆 Kubb Tournament Manager")
 with st.sidebar:
     st.header("1. Setup")
     team_input = st.text_area("Enter Team Names (one per line):", height=200)
-    if st.button("Generate Tournament"):
+    if st.button("Generate Balanced Schedule"):
         teams = [t.strip() for t in team_input.split('\n') if t.strip()]
-        if len(teams) < 8 or len(teams) % 2 != 0:
-            st.error("Please enter an even number of teams (at least 8).")
+        if len(teams) < 4 or len(teams) % 2 != 0:
+            st.error("Please enter an even number of teams (at least 4).")
         else:
             st.session_state.teams = teams
-            # Create Randomized Schedule (3 games each)
-            all_matches = []
-            pool = teams * 3
-            random.shuffle(pool)
             
-            # Simple pairing logic
-            temp_pool = list(pool)
-            while len(temp_pool) > 1:
-                t1 = temp_pool.pop(0)
-                for i, t2 in enumerate(temp_pool):
-                    if t2 != t1:
-                        all_matches.append({"Team A": t1, "Team B": t2, "Winner": None})
-                        temp_pool.pop(i)
-                        break
+            # --- CIRCLE ROTATION SCHEDULER ---
+            # Guarantees even spacing and no repeat matchups
+            n = len(teams)
+            t_list = list(teams)
+            all_possible_rounds = []
             
-            # Assign rounds and courts (2 courts)
-            scheduled_matches = []
-            for i, m in enumerate(all_matches):
-                round_num = (i // 2) + 1
-                court_num = (i % 2) + 1
-                m['Round'] = round_num
-                m['Court'] = court_num
-                scheduled_matches.append(m)
+            # Generate total rounds using circle method
+            for r in range(n - 1):
+                round_matches = []
+                for i in range(n // 2):
+                    t1 = t_list[i]
+                    t2 = t_list[n - 1 - i]
+                    round_matches.append((t1, t2))
+                all_possible_rounds.append(round_matches)
+                # Rotate everyone except the first team
+                t_list = [t_list[0]] + [t_list[-1]] + t_list[1:-1]
+
+            # We only need the first 3 rounds for your tournament
+            selected_rounds = all_possible_rounds[:3]
             
-            st.session_state.matches = pd.DataFrame(scheduled_matches)
-            st.success(f"Generated {len(teams)} teams and {len(all_matches)} matches!")
+            scheduled_data = []
+            match_idx = 1
+            for r_idx, round_matches in enumerate(selected_rounds):
+                # We have 2 courts, so we split the round's matches
+                # If 16 teams, 8 matches per 'circle round'. 
+                # We spread them across time slots.
+                for m_idx, (ta, tb) in enumerate(round_matches):
+                    # Logical Round = Time Slot. 
+                    # With 2 courts, we play 2 matches per 'Time Slot'
+                    time_slot = (r_idx * (n // 2) + m_idx) // 2 + 1
+                    court_num = (m_idx % 2) + 1
+                    scheduled_data.append({
+                        "Time Slot": time_slot,
+                        "Court": court_num,
+                        "Team A": ta,
+                        "Team B": tb,
+                        "Winner": None
+                    })
+            
+            st.session_state.matches = pd.DataFrame(scheduled_data)
+            st.success(f"Generated balanced schedule for {len(teams)} teams!")
 
 # --- APP TABS ---
 tab1, tab2, tab3 = st.tabs(["📅 Schedule & Scoring", "📊 Standings", "🥇 Top 8 Bracket"])
@@ -58,19 +71,23 @@ with tab1:
     if st.session_state.matches is not None:
         st.header("Match Schedule")
         df = st.session_state.matches
-        for idx, row in df.iterrows():
-            col1, col2, col3, col4 = st.columns([1, 2, 1, 2])
-            with col1: st.write(f"**R{row['Round']} - C{row['Court']}**")
-            with col2: 
-                if st.button(f"Winner: {row['Team A']}", key=f"a_{idx}"):
-                    st.session_state.matches.at[idx, 'Winner'] = row['Team A']
-            with col3: st.write("vs")
-            with col4:
-                if st.button(f"Winner: {row['Team B']}", key=f"b_{idx}"):
-                    st.session_state.matches.at[idx, 'Winner'] = row['Team B']
-            
-            if row['Winner']:
-                st.info(f"Result: {row['Winner']} won")
+        # Group by Time Slot to show what's happening 'Now'
+        for slot, slot_df in df.groupby("Time Slot"):
+            st.subheader(f"Round {slot}")
+            cols = st.columns(2)
+            for i, (idx, row) in enumerate(slot_df.iterrows()):
+                with cols[i]:
+                    st.write(f"**Court {row['Court']}**")
+                    label_a = f"🏆 {row['Team A']}" if row['Winner'] == row['Team A'] else row['Team A']
+                    label_b = f"🏆 {row['Team B']}" if row['Winner'] == row['Team B'] else row['Team B']
+                    
+                    if st.button(f"{label_a}", key=f"a_{idx}"):
+                        st.session_state.matches.at[idx, 'Winner'] = row['Team A']
+                        st.rerun()
+                    st.write("vs")
+                    if st.button(f"{label_b}", key=f"b_{idx}"):
+                        st.session_state.matches.at[idx, 'Winner'] = row['Team B']
+                        st.rerun()
             st.divider()
     else:
         st.info("Enter teams in the sidebar to start.")
@@ -84,20 +101,23 @@ with tab2:
             losses = len(st.session_state.matches[((st.session_state.matches['Team A'] == team) | (st.session_state.matches['Team B'] == team)) & (st.session_state.matches['Winner'].notnull()) & (st.session_state.matches['Winner'] != team)])
             results.append({"Team": team, "W": wins, "L": losses})
         
-        standings_df = pd.DataFrame(results).sort_values(by="W", ascending=False)
+        standings_df = pd.DataFrame(results).sort_values(by=["W", "L"], ascending=[False, True])
         st.table(standings_df)
 
 with tab3:
     if st.session_state.matches is not None:
-        if st.session_state.matches['Winner'].isnull().any():
+        finished = st.session_state.matches['Winner'].notnull().all()
+        if not finished:
             st.warning("Finish all preliminary matches to unlock the bracket.")
         else:
             st.header("Top 8 Single Elimination")
-            # Get Top 8
-            top_8 = pd.DataFrame(results).sort_values(by="W", ascending=False).head(8)['Team'].tolist()
+            standings = pd.DataFrame(results).sort_values(by="W", ascending=False).head(8)
+            top_8 = standings['Team'].tolist()
             
-            st.write("### Quarterfinals")
-            # 1 vs 8, 4 vs 5, 2 vs 7, 3 vs 6
-            qf = [(top_8[0], top_8[7]), (top_8[3], top_8[4]), (top_8[1], top_8[6]), (top_8[2], top_8[5])]
-            for i, (ta, tb) in enumerate(qf):
-                st.write(f"Match {i+1}: **{ta}** vs **{tb}**")
+            # Standard Seeding: 1v8, 4v5, 2v7, 3v6
+            col1, col2 = st.columns(2)
+            qf = [(0,7), (3,4), (1,6), (2,5)]
+            for i, (p1, p2) in enumerate(qf):
+                with col1 if i < 2 else col2:
+                    st.write(f"**Match {i+1}**")
+                    st.info(f"{top_8[p1]} vs {top_8[p2]}")
