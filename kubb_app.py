@@ -4,26 +4,26 @@ import pandas as pd
 
 st.set_page_config(page_title="Steger Ultimate Kubb Invitational", layout="centered")
 
-conn = st.connection(
-    "gsheets", 
-    type=GSheetsConnection, 
-    scopes=["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-)
+# SIMPLIFIED CONNECTION: Let the Secrets handle the details
+conn = st.connection("gsheets", type=GSheetsConnection)
 
 def get_data():
-    raw_data = conn.read(worksheet="Sheet1", ttl=0)
-    # Filter out completely empty rows that Google Sheets sometimes adds
-    return raw_data.dropna(how='all')
+    try:
+        # Pull data, and if the sheet is totally empty, return an empty DataFrame
+        df = conn.read(worksheet="Sheet1", ttl=0)
+        return df.dropna(how='all')
+    except Exception:
+        return pd.DataFrame()
 
 def update_sheet(df):
     try:
-        # Convert everything to string to prevent TypeErrors
-        df_to_save = df.astype(str)
-        conn.update(worksheet="Sheet1", data=df_to_save)
+        # Convert all columns to strings to avoid math/type errors in Google Sheets
+        df_save = df.astype(str)
+        conn.update(worksheet="Sheet1", data=df_save)
         st.cache_data.clear()
-        st.toast("✅ Sync Successful")
+        st.toast("✅ Match Updated!")
     except Exception as e:
-        st.error(f"Sync Error: {e}")
+        st.error(f"Sync failed: {e}")
 
 st.title("🏆 Steger Ultimate Kubb Invitational")
 
