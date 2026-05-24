@@ -2,123 +2,112 @@ import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 
-# 1. Page Config
-st.set_page_config(page_title="Steger Ultimate Kubb Invitational", layout="wide")
+# 1. Page Configuration
+st.set_page_config(page_title="Steger Ultimate Kubb Invitational", layout="centered")
 
-# 2. Connect to the "Shared Brain" (Google Sheets)
-conn = st.connection("gsheets", type=GSheetsConnection)
+# 2. Connect to Google Sheets with full permissions
+conn = st.connection(
+    "gsheets", 
+    type=GSheetsConnection, 
+    scopes=["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+)
 
 def get_data():
-    # Pulls the current state of the tournament
-    return conn.read(ttl=0)
+    return conn.read(worksheet="Sheet1", ttl=0)
 
 def update_sheet(df):
-    # Pushes the new results back to the shared sheet
-    conn.update(data=df)
-    st.cache_data.clear()
+    try:
+        # Clean data and sync
+        df_to_save = df.dropna(subset=["Team A"]).astype(str)
+        conn.update(worksheet="Sheet1", data=df_to_save)
+        st.cache_data.clear()
+        st.toast("✅ Result Saved!")
+    except Exception as e:
+        st.error(f"Sync Error: {e}")
 
 st.title("🏆 Steger Ultimate Kubb Invitational")
 
-# 3. Load existing data or create empty
+# 3. Load Data
 try:
     df = get_data()
-except Exception:
+except:
     df = pd.DataFrame()
 
-# --- TAB 0: SETUP (Only shows if no teams exist yet) ---
+# --- SETUP (Only shows if sheet is empty) ---
 if df.empty or "Team A" not in df.columns:
-    st.header("Tournament Setup")
+    st.header("Tournament Setup (1 Court)")
     team_input = st.text_area("Enter Team Names (one per line):", height=200)
     
-    if st.button("🚀 Launch Tournament for Everyone"):
+    if st.button("🚀 Launch Tournament"):
         teams = [t.strip() for t in team_input.split('\n') if t.strip()]
         if len(teams) < 4 or len(teams) % 2 != 0:
             st.error("Please enter an even number of teams.")
         else:
-            # --- CIRCLE ROTATION SCHEDULER ---
+            # Circle Rotation for 3 Games
             n = len(teams)
             t_list = list(teams)
-            all_rounds = []
-            for r in range(n - 1):
-                round_m = []
+            matches = []
+            for r in range(3): # Only 3 Rounds
                 for i in range(n // 2):
-                    round_m.append((t_list[i], t_list[n - 1 - i]))
-                all_rounds.append(round_m)
-                t_list = [t_list[0]] + [t_list[-1]] + t_list[1:-1]
-
-            # Build the master dataframe
-            init_data = []
-            for r_idx, m_list in enumerate(all_rounds[:3]):
-                for m_idx, (ta, tb) in enumerate(m_list):
-                    time_slot = (r_idx * (n // 2) + m_idx) // 2 + 1
-                    court_num = (m_idx % 2) + 1
-                    init_data.append({
-                        "Time Slot": int(time_slot),
-                        "Court": int(court_num),
-                        "Team A": ta,
-                        "Team B": tb,
+                    matches.append({
+                        "Game": len(matches) + 1,
+                        "Team A": t_list[i],
+                        "Team B": t_list[n - 1 - i],
                         "Winner": "None"
                     })
+                # Rotate
+                t_list = [t_list[0]] + [t_list[-1]] + t_list[1:-1]
             
-            master_df = pd.DataFrame(init_data)
+            master_df = pd.DataFrame(matches)
             update_sheet(master_df)
             st.rerun()
 
-# --- THE MAIN APP (Shows once setup is done) ---
+# --- LIVE APP ---
 else:
-    tab1, tab2, tab3 = st.tabs(["📅 Live Schedule", "📊 Standings", "🥇 Top 8 Bracket"])
+    tab1, tab2, tab3 = st.tabs(["📅 Schedule", "📊 Standings", "🥇 Bracket"])
 
     with tab1:
-        st.info("Tap a team name to record a win. All players see updates live.")
-        # Filter out empty rows if Google Sheets adds them
-        display_df = df.dropna(subset=["Team A"])
-        
-        for slot, slot_df in display_df.groupby("Time Slot"):
-            st.subheader(f"Round {int(slot)}")
-            cols = st.columns(2)
-            for i, (idx, row) in enumerate(slot_df.iterrows()):
-                with cols[i]:
-                    st.write(f"**Court {int(row['Court'])}**")
-                    
-                    # Team A Button
-                    label_a = f"🏆 {row['Team A']}" if row['Winner'] == row['Team A'] else row['Team A']
-                    if st.button(label_a, key=f"a_{idx}"):
+        st.info("Tap the winner of each match.")
+        for idx, row in df.iterrows():
+            with st.container(border=True):
+                st.write(f"### Match {row['Game']}")
+                
+                # Winner selection buttons
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    is_winner_a = row['Winner'] == row['Team A']
+                    btn_type_a = "primary" if is_winner_a else "secondary"
+                    if st.button(f"{'👑 ' if is_winner_a else ''}{row['Team A']}", key=f"a_{idx}", type=btn_type_a, use_container_width=True):
                         df.at[idx, 'Winner'] = row['Team A']
                         update_sheet(df)
                         st.rerun()
-                    
-                    st.write("vs")
-                    
-                    # Team B Button
-                    label_b = f"🏆 {row['Team B']}" if row['Winner'] == row['Team B'] else row['Team B']
-                    if st.button(label_b, key=f"b_{idx}"):
+                
+                with col2:
+                    is_winner_b = row['Winner'] == row['Team B']
+                    btn_type_b = "primary" if is_winner_b else "secondary"
+                    if st.button(f"{'👑 ' if is_winner_b else ''}{row['Team B']}", key=f"b_{idx}", type=btn_type_b, use_container_width=True):
                         df.at[idx, 'Winner'] = row['Team B']
                         update_sheet(df)
                         st.rerun()
-            st.divider()
 
     with tab2:
-        st.header("Current Rankings")
-        # Extract all team names
-        all_teams = pd.unique(display_df[['Team A', 'Team B']].values.ravel())
+        st.header("Rankings")
+        all_teams = pd.unique(df[['Team A', 'Team B']].values.ravel())
         standings = []
         for team in all_teams:
-            wins = len(display_df[display_df['Winner'] == team])
-            losses = len(display_df[((display_df['Team A'] == team) | (display_df['Team B'] == team)) & 
-                                   (display_df['Winner'] != "None") & (display_df['Winner'] != team)])
-            standings.append({"Team": team, "Wins": wins, "Losses": losses})
+            wins = len(df[df['Winner'] == team])
+            losses = len(df[( (df['Team A'] == team) | (df['Team B'] == team) ) & (df['Winner'] != "None") & (df['Winner'] != team)])
+            standings.append({"Team": team, "W": wins, "L": losses})
         
-        standings_df = pd.DataFrame(standings).sort_values(by=["Wins", "Losses"], ascending=[False, True])
-        st.table(standings_df)
+        st.table(pd.DataFrame(standings).sort_values(by=["W", "L"], ascending=[False, True]))
 
     with tab3:
-        finished = (display_df['Winner'] == "None").sum() == 0
-        if not finished:
-            st.warning("The Bracket will unlock once all Preliminary rounds are complete.")
+        if (df['Winner'] == "None").any():
+            st.warning("Complete all preliminary matches to view the Top 8.")
         else:
-            st.header("Top 8 Championship")
-            top_8 = pd.DataFrame(standings).sort_values(by="Wins", ascending=False).head(8)['Team'].tolist()
-            
+            st.header("Top 8 Bracket")
+            top_8 = pd.DataFrame(standings).sort_values(by="W", ascending=False).head(8)['Team'].tolist()
             seeds = [(0,7), (3,4), (1,6), (2,5)]
             for i, (p1, p2) in enumerate(seeds):
-                st.info(f"Match {i+1}: **{top_8[p1]}** vs **{top_8[p2]}**")
+                st.success(f"Match {i+1}: **{top_8[p1]}** (1) vs **{top_8[p2]}** (8)")
