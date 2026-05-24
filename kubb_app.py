@@ -4,37 +4,36 @@ import pandas as pd
 
 st.set_page_config(page_title="Steger Ultimate Kubb Invitational", layout="centered")
 
-# SIMPLIFIED CONNECTION: Let the Secrets handle the details
+# 1. Connect
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 def get_data():
     try:
-        # Pull data, and if the sheet is totally empty, return an empty DataFrame
+        # Pull data and force everything to be a 'string' (text) immediately
         df = conn.read(worksheet="Sheet1", ttl=0)
-        return df.dropna(how='all')
+        df = df.dropna(how='all').astype(str)
+        return df
     except Exception:
         return pd.DataFrame()
 
 def update_sheet(df):
     try:
-        # Convert all columns to strings to avoid math/type errors in Google Sheets
+        # Final safety check: convert to string before saving
         df_save = df.astype(str)
         conn.update(worksheet="Sheet1", data=df_save)
         st.cache_data.clear()
-        st.toast("✅ Match Updated!")
+        st.toast("✅ Match Saved!")
     except Exception as e:
         st.error(f"Sync failed: {e}")
 
 st.title("🏆 Steger Ultimate Kubb Invitational")
 
-try:
-    df = get_data()
-except Exception:
-    df = pd.DataFrame()
+# 2. Load Data
+df = get_data()
 
 # --- SETUP ---
 if df.empty or "Team A" not in df.columns:
-    st.header("Tournament Setup (1 Court)")
+    st.header("Tournament Setup")
     team_input = st.text_area("Enter Team Names (one per line):")
     
     if st.button("🚀 Launch Tournament"):
@@ -42,7 +41,6 @@ if df.empty or "Team A" not in df.columns:
         if len(teams) < 4:
             st.error("Enter at least 4 teams.")
         else:
-            # Circle Rotation logic
             t_list = list(teams)
             if len(t_list) % 2 != 0: t_list.append("BYE")
             n = len(t_list)
@@ -57,7 +55,9 @@ if df.empty or "Team A" not in df.columns:
                     })
                 t_list = [t_list[0]] + [t_list[-1]] + t_list[1:-1]
             
-            update_sheet(pd.DataFrame(matches))
+            # Create DataFrame and FORCE it to be objects (text)
+            master_df = pd.DataFrame(matches).astype(str)
+            update_sheet(master_df)
             st.rerun()
 
 # --- LIVE APP ---
@@ -65,42 +65,41 @@ else:
     tab1, tab2, tab3 = st.tabs(["📅 Schedule", "📊 Standings", "🥇 Bracket"])
 
     with tab1:
-        for idx, row in df.iterrows():
-            # Use .get() or str conversion to avoid TypeErrors on missing data
-            ta = str(row.get('Team A', 'Unknown'))
-            tb = str(row.get('Team B', 'Unknown'))
-            winner = str(row.get('Winner', 'None'))
-            game_num = str(row.get('Game', idx))
-
+        # We make a COPY of the data to ensure we don't hit "SettingWithCopy" warnings
+        live_df = df.copy().astype(str)
+        
+        for idx, row in live_df.iterrows():
+            ta = row['Team A']
+            tb = row['Team B']
+            winner = row['Winner']
+            
             with st.container(border=True):
-                st.write(f"### Match {game_num}")
+                st.write(f"### Match {row['Game']}")
                 c1, c2 = st.columns(2)
                 
                 with c1:
                     is_a = (winner == ta)
                     if st.button(f"{'👑 ' if is_a else ''}{ta}", key=f"a_{idx}", use_container_width=True, type="primary" if is_a else "secondary"):
-                        df.at[idx, 'Winner'] = ta
-                        update_sheet(df)
+                        live_df.at[idx, 'Winner'] = str(ta)
+                        update_sheet(live_df)
                         st.rerun()
                 with c2:
                     is_b = (winner == tb)
                     if st.button(f"{'👑 ' if is_b else ''}{tb}", key=f"b_{idx}", use_container_width=True, type="primary" if is_b else "secondary"):
-                        df.at[idx, 'Winner'] = tb
-                        update_sheet(df)
+                        live_df.at[idx, 'Winner'] = str(tb)
+                        update_sheet(live_df)
                         st.rerun()
 
     with tab2:
         st.header("Rankings")
-        # Ensure we are only looking at valid team rows
-        valid_df = df[df['Team A'].notnull()]
-        all_teams = pd.unique(valid_df[['Team A', 'Team B']].values.ravel())
+        all_teams = pd.unique(live_df[['Team A', 'Team B']].values.ravel())
         standings = []
         for team in all_teams:
-            if team == "BYE": continue
-            w = len(valid_df[valid_df['Winner'] == team])
+            if team == "BYE" or team == "nan": continue
+            w = len(live_df[live_df['Winner'] == team])
             standings.append({"Team": team, "Wins": w})
         
         st.table(pd.DataFrame(standings).sort_values(by="Wins", ascending=False))
 
     with tab3:
-        st.info("Top 8 will be displayed here after Prelims.")
+        st.info("Top 8 will be displayed here after all 3 rounds are complete.")
