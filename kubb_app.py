@@ -129,4 +129,6 @@ else:
             standings_df = pd.DataFrame(standings_data).sort_values(by="Wins", ascending=False)
             top_8 = standings_df.head(8)['Team'].tolist()
             
-            seeds = [(0,7
+            seeds = [(0,7), (3,4), (1,6), (2,5)]
+            for i, (p1, p2) in enumerate(seeds):
+                st.success(f"**Match {i+1}:** {top_8[p1]} (1) vs {top_8[p2]} (8)")
