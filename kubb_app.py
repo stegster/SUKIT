@@ -43,7 +43,7 @@ with col_mid:
     except:
         st.info("ℹ️ SUKIT Invitational 2022 - (Banner 'sukit_banner.png' not found)")
 
-st.markdown("<h1 style='text-align: center; color: #4A2C2A; margin-top: -10px;'>Steger Ultimate Kubb Invitational</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center; color: #4A2C2A; margin-top: -10px;'>Steger Ultimate Kubb Invitational Tournament</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center; font-size: 20px; color: #6D4C41; margin-top: -20px;'><i>Precision. Strategy. Wood.</i></p>", unsafe_allow_html=True)
 st.divider()
 
