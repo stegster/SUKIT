@@ -31,14 +31,12 @@ def update_sheet(df):
 st.title("🏆 Steger Ultimate Kubb Invitational")
 
 # --- PERSISTENCE LATCH ---
-# This prevents the app from "forgetting" it's in a tournament during slow syncs
 if "tournament_active" not in st.session_state:
     st.session_state.tournament_active = False
 
 with st.spinner("Syncing Scoreboard..."):
     df = get_data()
 
-# If the sheet has data, lock the session into active mode
 if not df.empty and "Team A" in df.columns:
     st.session_state.tournament_active = True
 
@@ -73,12 +71,11 @@ if not st.session_state.tournament_active:
             new_df = pd.DataFrame(matches).astype(str)
             update_sheet(new_df)
             st.session_state.tournament_active = True
-            time.sleep(1) # Give Google time to write
+            time.sleep(1) 
             st.rerun()
 
 # --- LIVE APP PHASE ---
 else:
-    # Backup: If the sync returned empty mid-tournament, wait and retry instead of showing Setup
     if df.empty:
         st.warning("🔄 Re-syncing with Court... one moment.")
         time.sleep(1)
@@ -96,7 +93,6 @@ else:
         wins = len(prelims[prelims['Winner'] == t])
         played = len(prelims[((prelims['Team A'] == t) | (prelims['Team B'] == t)) & (prelims['Winner'] != "None")])
         opponents = prelims[prelims['Team A'] == t]['Team B'].tolist() + prelims[prelims['Team B'] == t]['Team A'].tolist()
-        # SoS: Combined wins of every team you played
         sos = sum([len(prelims[prelims['Winner'] == opp]) for opp in opponents if opp != "BYE"])
         
         standings_list.append({
@@ -107,7 +103,12 @@ else:
             "GP": played
         })
     
+    # Sort and fix the "Random Numbers" (Index) issue
     standings_df = pd.DataFrame(standings_list).sort_values(by=["Wins", "SoS", "Losses"], ascending=[False, False, True])
+    
+    # NEW: This resets the numbers to be 1, 2, 3... based on the new order
+    standings_df.reset_index(drop=True, inplace=True)
+    standings_df.index += 1 
 
     # 2. PRELIMS TAB
     with tab1:
@@ -134,7 +135,8 @@ else:
     # 3. LEADERBOARD TAB
     with tab2:
         st.subheader("Leaderboard")
-        st.caption("Tiebreaker: Strength of Schedule (Total wins of opponents played)")
+        st.caption("Rank | Team | Wins | Losses | SoS (Tiebreaker) | GP")
+        # Displaying the table with the cleaned-up Rank index
         st.table(standings_df)
 
     # 4. BRACKET TAB
