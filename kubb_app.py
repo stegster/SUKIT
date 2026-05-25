@@ -130,8 +130,8 @@ else:
             st.warning(f"Complete {p_rem} more matches to lock the bracket.")
             st.info("Current Projected Seeds: " + ", ".join(standings_df.head(8)['Team'].tolist()))
         else:
-            # --- SNOW CELEBRATION (WOOD SPLINTERS) ---
-            st.snow() 
+            # --- balloon CELEBRATION (WOOD SPLINTERS) ---
+            st.balloons() 
             st.success("🏆 Preliminary Rounds Complete! Championship Seeds Locked.")
             
             top_8 = standings_df.head(8)['Team'].tolist()
