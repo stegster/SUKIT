@@ -34,16 +34,21 @@ def reset_tournament():
     st.session_state.tournament_active = False
     st.rerun()
 
-# --- HEADER IMAGE ---
-# This now looks for the file inside your GitHub folder.
-# Ensure the file 'sukit_banner.jpg' is uploaded to your GitHub repo.
-try:
-    st.image("sukit_banner.png", use_container_width=True)
-except:
-    st.warning("⚠️ Banner image 'sukit_banner.jpg' not found in GitHub folder.")
+# --- HEADER SECTION (OPTION 2: CENTERED & REDUCED SIZE) ---
+# We create 3 columns. The middle column (2) holds the image.
+# To make the image even smaller, you could change this to [1.5, 1, 1.5]
+col_l, col_mid, col_r = st.columns([1, 2, 1])
 
-st.markdown("<h1 style='text-align: center; color: #4A2C2A;'>Steger Ultimate Kubb Invitational</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; font-size: 22px; color: #6D4C41;'><i>Precision. Strategy. Wood.</i></p>", unsafe_allow_html=True)
+with col_mid:
+    try:
+        # Looks for the new thin banner in your GitHub repo
+        st.image("sukit_banner.jpg", use_container_width=True)
+    except:
+        st.info("ℹ️ Upload 'sukit_banner.jpg' to GitHub to see your custom banner here.")
+
+# Title and Subtitle centered below the image
+st.markdown("<h1 style='text-align: center; color: #4A2C2A; margin-top: -10px;'>Steger Ultimate Kubb Invitational</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; font-size: 20px; color: #6D4C41; margin-top: -20px;'><i>Precision. Strategy. Wood.</i></p>", unsafe_allow_html=True)
 st.divider()
 
 # --- SIDEBAR ---
@@ -146,13 +151,4 @@ else:
     with tab3:
         p_rem = (prelims['Winner'] == "None").sum()
         if p_rem > 0:
-            st.warning(f"Official seeding is locked. {p_rem} matches left.")
-            st.info("Current Projected Seeds: " + ", ".join(standings_df.head(8)['Team'].tolist()))
-        else:
-            st.balloons()
-            top_8 = standings_df.head(8)['Team'].tolist()
-            seeds = [(0,7), (3,4), (1,6), (2,5)]
-            for i, (p1, p2) in enumerate(seeds):
-                with st.container(border=True):
-                    st.write(f"**Quarterfinal Match {i+1}**")
-                    st.markdown(f"### {top_8[p1]} (Seed {p1+1}) vs {top_8[p2]} (Seed {p2+1})")
+            st.warning(f
