@@ -5,146 +5,113 @@ import time
 
 st.set_page_config(page_title="Steger Ultimate Kubb Invitational", layout="centered")
 
-# --- CONNECTION ---
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 def get_data():
     try:
         data = conn.read(worksheet="Sheet1", ttl=0)
         if data is not None and not data.empty:
-            df = data.dropna(how='all').astype(str)
-            return df.apply(lambda x: x.str.strip())
+            return data.dropna(how='all').astype(str).apply(lambda x: x.str.strip())
     except:
         pass
     return pd.DataFrame()
 
 def update_sheet(df):
     try:
-        df_save = df.astype(str)
-        conn.update(worksheet="Sheet1", data=df_save)
-        st.cache_data.clear() 
-        st.toast("✅ Match Saved")
+        conn.update(worksheet="Sheet1", data=df.astype(str))
+        st.cache_data.clear()
+        st.toast("✅ Update Synced")
     except Exception as e:
         st.error(f"Sync failed: {e}")
 
 st.title("🏆 Steger Ultimate Kubb Invitational")
 
-# --- PERSISTENCE CHECK ---
-# If we haven't checked for a tournament yet, do it now
-if "tournament_active" not in st.session_state:
-    st.session_state.tournament_active = False
-
-with st.spinner("Updating Scoreboard..."):
+with st.spinner("Loading Tournament Data..."):
     df = get_data()
 
-# If the cloud has data, we are definitely active
-if not df.empty and "Team A" in df.columns:
-    st.session_state.tournament_active = True
-
-# --- SETUP PHASE ---
-# Only show setup if the cloud is empty AND we aren't already mid-session
-if not st.session_state.tournament_active:
+# --- SETUP ---
+if df.empty or "Team A" not in df.columns:
     st.header("Tournament Setup")
-    team_input = st.text_area("Enter Team Names (one per line):", height=250)
-    
+    team_input = st.text_area("Enter Team Names (one per line):")
     if st.button("🚀 Launch Tournament"):
         teams = [t.strip() for t in team_input.split('\n') if t.strip()]
         if len(teams) < 4:
-            st.error("Please enter at least 4 teams.")
+            st.error("Need at least 4 teams.")
         else:
             t_list = list(teams)
             if len(t_list) % 2 != 0: t_list.append("BYE")
-            
-            n = len(t_list)
-            matches = []
+            n, matches = len(t_list), []
+            # Generate 3 rounds of play
             for r in range(3):
                 for i in range(n // 2):
                     ta, tb = t_list[i], t_list[n - 1 - i]
                     if ta != "BYE" and tb != "BYE":
-                        matches.append({
-                            "Game": len(matches) + 1,
-                            "Team A": ta,
-                            "Team B": tb,
-                            "Winner": "None"
-                        })
+                        matches.append({"Type": "Prelim", "Game": str(len(matches) + 1), "Team A": ta, "Team B": tb, "Winner": "None"})
                 t_list = [t_list[0]] + [t_list[-1]] + t_list[1:-1]
-            
-            new_df = pd.DataFrame(matches).astype(str)
-            update_sheet(new_df)
-            st.session_state.tournament_active = True
-            time.sleep(1)
+            update_sheet(pd.DataFrame(matches))
             st.rerun()
 
-# --- LIVE APP PHASE ---
+# --- LIVE APP ---
 else:
-    # If the data came back empty mid-tournament, show a small warning instead of the setup screen
-    if df.empty:
-        st.warning("🔄 Re-syncing with Google Sheets... please wait a moment.")
-        time.sleep(1)
-        st.rerun()
+    tab1, tab2, tab3 = st.tabs(["📅 Prelims", "📊 Leaderboard", "🥇 Bracket"])
+    
+    # 1. LIVE STANDINGS CALCULATION (SoS Tiebreaker Retained)
+    prelims = df[df['Type'] == 'Prelim']
+    all_teams = pd.unique(prelims[['Team A', 'Team B']].values.ravel())
+    all_teams = [t for t in all_teams if t not in ["BYE", "nan", "None", ""]]
+    
+    standings_list = []
+    for t in all_teams:
+        wins = len(prelims[prelims['Winner'] == t])
+        played = len(prelims[((prelims['Team A'] == t) | (prelims['Team B'] == t)) & (prelims['Winner'] != "None")])
+        # Find all opponents played
+        opponents = prelims[prelims['Team A'] == t]['Team B'].tolist() + prelims[prelims['Team B'] == t]['Team A'].tolist()
+        # Strength of Schedule: Sum of wins of all opponents
+        sos = sum([len(prelims[prelims['Winner'] == opp]) for opp in opponents if opp != "BYE"])
+        standings_list.append({"Team": t, "Wins": wins, "Losses": played - wins, "SoS": sos})
+    
+    # Sort by Wins, then SoS, then fewer Losses
+    standings_df = pd.DataFrame(standings_list).sort_values(by=["Wins", "SoS", "Losses"], ascending=[False, False, True])
 
-    tab1, tab2, tab3 = st.tabs(["📅 Schedule", "📊 Standings", "🥇 Bracket"])
-    live_df = df.copy()
-
+    # 2. PRELIMS TAB
     with tab1:
-        st.write(f"### {len(live_df)} Matches Scheduled")
-        for idx, row in live_df.iterrows():
-            clean_num = str(row['Game']).split('.')[0]
+        st.write(f"### {len(prelims)} Prelim Matches")
+        for idx, row in prelims.iterrows():
             with st.container(border=True):
-                st.write(f"#### Match {clean_num}")
+                st.write(f"Match {row['Game']}")
                 c1, c2 = st.columns(2)
-                ta, tb = str(row['Team A']), str(row['Team B'])
-                winner = str(row['Winner'])
+                for i, team_key in enumerate(['Team A', 'Team B']):
+                    name = row[team_key]
+                    is_winner = row['Winner'] == name
+                    if [c1, c2][i].button(f"{'👑 ' if is_winner else ''}{name}", key=f"p_{idx}_{i}", use_container_width=True, type="primary" if is_winner else "secondary"):
+                        df.at[idx, 'Winner'] = name
+                        update_sheet(df); st.rerun()
 
-                with c1:
-                    is_a = (winner == ta)
-                    if st.button(f"{'👑 ' if is_a else ''}{ta}", key=f"a_{idx}", use_container_width=True, type="primary" if is_a else "secondary"):
-                        live_df.at[idx, 'Winner'] = ta
-                        update_sheet(live_df)
-                        st.rerun()
-                with c2:
-                    is_b = (winner == tb)
-                    if st.button(f"{'👑 ' if is_b else ''}{tb}", key=f"b_{idx}", use_container_width=True, type="primary" if is_b else "secondary"):
-                        live_df.at[idx, 'Winner'] = tb
-                        update_sheet(live_df)
-                        st.rerun()
-
+    # 3. LEADERBOARD TAB
     with tab2:
-        st.header("Rankings")
-        raw_teams = pd.unique(live_df[['Team A', 'Team B']].values.ravel())
-        teams_only = [str(t).strip() for t in raw_teams if str(t).strip() not in ["BYE", "nan", "None", ""]]
-        
-        standings_data = []
-        for t in teams_only:
-            wins = len(live_df[live_df['Winner'].str.strip() == t])
-            played = len(live_df[((live_df['Team A'].str.strip() == t) | (live_df['Team B'].str.strip() == t)) & (live_df['Winner'].str.strip() != "None")])
-            losses = played - wins
-            standings_data.append({"Team": t, "Wins": wins, "Losses": losses, "GP": played})
-        
-        if standings_data:
-            sdf = pd.DataFrame(standings_data).sort_values(by=["Wins", "Losses"], ascending=[False, True])
-            st.table(sdf)
+        st.subheader("Tournament Standings")
+        st.caption("Tiebreaker 1: Strength of Schedule (Total wins of opponents played)")
+        st.table(standings_df)
 
+    # 4. BRACKET TAB (The Original Style)
     with tab3:
-        st.header("Top 8 Bracket")
-        finished_games = live_df[live_df['Winner'].str.strip() != "None"]
-        remaining = len(live_df) - len(finished_games)
+        st.header("Top 8 Championship")
+        remaining = (prelims['Winner'] == "None").sum()
         
         if remaining > 0:
-            st.warning(f"Tournament in progress. {remaining} matches left to seed the bracket.")
+            st.warning(f"Championship Bracket will unlock once the final {remaining} matches are completed.")
+            st.info("Current Projected Top 8:")
+            st.write(", ".join(standings_df.head(8)['Team'].tolist()))
         else:
             st.balloons()
-            final_standings = pd.DataFrame(standings_data).sort_values(by=["Wins", "Losses"], ascending=[False, True])
-            top_teams = final_standings['Team'].tolist()
-            num_to_show = min(len(top_teams), 8)
-            bracket_teams = top_teams[:num_to_show]
+            st.success("Preliminary Rounds Complete!")
+            # Get the top 8 teams based on the leaderboard
+            top_8 = standings_df.head(8)['Team'].tolist()
             
-            for i, team in enumerate(bracket_teams):
-                st.write(f"**Seed {i+1}:** {team}")
-            
-            if len(bracket_teams) >= 4:
-                st.divider()
-                st.write("### Recommended Matchups")
-                seeds = [(0,3), (1,2)] if len(bracket_teams) < 8 else [(0,7), (3,4), (1,6), (2,5)]
-                for i, (p1, p2) in enumerate(seeds):
-                    st.info(f"Match {i+1}: {bracket_teams[p1]} vs {bracket_teams[p2]}")
+            # Standard 1-8, 4-5, 2-7, 3-6 seeding
+            st.write("### Quarterfinal Matchups")
+            seeds = [(0,7), (3,4), (1,6), (2,5)]
+            for i, (p1, p2) in enumerate(seeds):
+                with st.container(border=True):
+                    st.write(f"**Match {i+1}**")
+                    st.write(f"{top_8[p1]} (Seed {p1+1}) vs {top_8[p2]} (Seed {p2+1})")
