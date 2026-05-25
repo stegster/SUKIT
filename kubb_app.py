@@ -35,8 +35,8 @@ def reset_tournament():
     st.rerun()
 
 # --- HEADER IMAGE ---
-# Using the permanent hosted link for the SUKIT Banner
-st.image("https://i.imgur.com/L1N3oU1.jpeg", use_container_width=True)
+# NEW PERMANENT LINK: Using PostImages direct link for better stability
+st.image("https://i.postimg.cc/85zK6X6k/SUKIT-Banner.jpg", use_container_width=True)
 
 st.markdown("<h1 style='text-align: center;'>Steger Ultimate Kubb Invitational</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center; font-size: 20px;'><i>Precision. Strategy. Wood.</i></p>", unsafe_allow_html=True)
@@ -47,7 +47,7 @@ with st.sidebar:
     st.header("🏆 About SUKIT")
     st.info("**S**teger **U**ltimate **K**ubb **I**nvitational **T**ournament")
     st.write("---")
-    st.header("⚙️ Admin")
+    st.header("⚙️ Admin Controls")
     if st.button("🚨 Reset Tournament Data", use_container_width=True):
         reset_tournament()
 
@@ -55,7 +55,7 @@ with st.sidebar:
 if "tournament_active" not in st.session_state:
     st.session_state.tournament_active = False
 
-with st.spinner("Syncing with the pits..."):
+with st.spinner("Checking the pits..."):
     df = get_data()
 
 if not df.empty and "Team A" in df.columns:
@@ -64,7 +64,7 @@ if not df.empty and "Team A" in df.columns:
 # --- SETUP PHASE ---
 if not st.session_state.tournament_active:
     st.subheader("🔥 Start a New Session")
-    team_input = st.text_area("Enter Team Names (one per line):", height=200, placeholder="Team 1\nTeam 2...")
+    team_input = st.text_area("Enter Team Names (one per line):", height=200, placeholder="Example:\nWood Chippers\nKubb-a-Libre...")
     
     if st.button("Generate Tournament Schedule", type="primary"):
         teams = [t.strip() for t in team_input.split('\n') if t.strip()]
@@ -97,13 +97,13 @@ if not st.session_state.tournament_active:
 # --- LIVE APP PHASE ---
 else:
     if df.empty:
-        st.warning("🔄 Re-syncing... one moment.")
+        st.warning("🔄 Syncing data... just a moment.")
         time.sleep(1)
         st.rerun()
 
     tab1, tab2, tab3 = st.tabs(["📅 Match Schedule", "📊 Leaderboard", "🥇 Top 8 Bracket"])
     
-    # Standings Logic (SoS Tiebreaker)
+    # Standings Logic
     prelims = df[df['Type'] == 'Prelim']
     all_teams = pd.unique(prelims[['Team A', 'Team B']].values.ravel())
     all_teams = [t for t in all_teams if t not in ["BYE", "nan", "None", ""]]
@@ -121,6 +121,7 @@ else:
     standings_df.index += 1
 
     with tab1:
+        st.write("### Preliminary Rounds")
         for idx, row in prelims.iterrows():
             with st.container(border=True):
                 c1, c2, c3 = st.columns([1, 2, 2])
@@ -135,14 +136,14 @@ else:
                     update_sheet(df); st.rerun()
 
     with tab2:
-        st.subheader("Tournament Rankings")
+        st.subheader("Leaderboard")
         st.table(standings_df)
 
     with tab3:
         p_rem = (prelims['Winner'] == "None").sum()
         if p_rem > 0:
-            st.warning(f"Championship seeding is locked until prelims finish ({p_rem} left).")
-            st.info("Current Projected Top 8: " + ", ".join(standings_df.head(8)['Team'].tolist()))
+            st.warning(f"Complete {p_rem} more matches to unlock the official bracket.")
+            st.info("Current Projected Seeds: " + ", ".join(standings_df.head(8)['Team'].tolist()))
         else:
             st.balloons()
             top_8 = standings_df.head(8)['Team'].tolist()
