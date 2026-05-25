@@ -46,10 +46,6 @@ with col_mid:
     except:
         st.info("ℹ️ Upload 'sukit_banner.png' to GitHub to see your custom banner here.")
 
-# Title and Subtitle centered below the image
-st.markdown("<h1 style='text-align: center; color: #4A2C2A; margin-top: -10px;'>Steger Ultimate Kubb Invitational</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; font-size: 20px; color: #6D4C41; margin-top: -20px;'><i>Precision. Strategy. Wood.</i></p>", unsafe_allow_html=True)
-st.divider()
 
 # --- SIDEBAR ---
 with st.sidebar:
