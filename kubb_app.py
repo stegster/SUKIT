@@ -28,7 +28,21 @@ def update_sheet(df):
     except Exception as e:
         st.error(f"Sync failed: {e}")
 
+# --- NEW: RESET FUNCTION ---
+def reset_tournament():
+    # Create an empty dataframe with the expected columns but no rows
+    empty_df = pd.DataFrame(columns=["Type", "Game", "Team A", "Team B", "Winner"])
+    update_sheet(empty_df)
+    st.session_state.tournament_active = False
+    st.rerun()
+
 st.title("🏆 Steger Ultimate Kubb Invitational")
+
+# --- SIDEBAR TOOLS ---
+with st.sidebar:
+    st.header("⚙️ Admin Controls")
+    if st.button("🚨 Reset Tournament", help="This will delete all matches and winners from the spreadsheet!"):
+        reset_tournament()
 
 # --- PERSISTENCE LATCH ---
 if "tournament_active" not in st.session_state:
@@ -83,7 +97,7 @@ else:
 
     tab1, tab2, tab3 = st.tabs(["📅 Prelims", "📊 Leaderboard", "🥇 Bracket"])
     
-    # 1. STANDINGS LOGIC (With SoS Tiebreaker)
+    # 1. STANDINGS LOGIC
     prelims = df[df['Type'] == 'Prelim']
     all_teams = pd.unique(prelims[['Team A', 'Team B']].values.ravel())
     all_teams = [t for t in all_teams if t not in ["BYE", "nan", "None", ""]]
@@ -96,17 +110,10 @@ else:
         sos = sum([len(prelims[prelims['Winner'] == opp]) for opp in opponents if opp != "BYE"])
         
         standings_list.append({
-            "Team": t, 
-            "Wins": wins, 
-            "Losses": played - wins, 
-            "SoS": sos,
-            "GP": played
+            "Team": t, "Wins": wins, "Losses": played - wins, "SoS": sos, "GP": played
         })
     
-    # Sort and fix the "Random Numbers" (Index) issue
     standings_df = pd.DataFrame(standings_list).sort_values(by=["Wins", "SoS", "Losses"], ascending=[False, False, True])
-    
-    # NEW: This resets the numbers to be 1, 2, 3... based on the new order
     standings_df.reset_index(drop=True, inplace=True)
     standings_df.index += 1 
 
@@ -135,25 +142,18 @@ else:
     # 3. LEADERBOARD TAB
     with tab2:
         st.subheader("Leaderboard")
-        st.caption("Rank | Team | Wins | Losses | SoS (Tiebreaker) | GP")
-        # Displaying the table with the cleaned-up Rank index
         st.table(standings_df)
 
     # 4. BRACKET TAB
     with tab3:
         st.header("Top 8 Championship")
         p_remaining = (prelims['Winner'] == "None").sum()
-        
         if p_remaining > 0:
-            st.warning(f"Championship Bracket will unlock once the final {p_remaining} matches are completed.")
-            st.info("Current Projected Seeds (1-8):")
-            st.write(", ".join(standings_df.head(8)['Team'].tolist()))
+            st.warning(f"Unlock bracket after {p_remaining} more matches.")
+            st.info("Current Projected Seeds (1-8): " + ", ".join(standings_df.head(8)['Team'].tolist()))
         else:
             st.balloons()
-            st.success("Preliminary Rounds Complete!")
             top_8 = standings_df.head(8)['Team'].tolist()
-            
-            st.write("### Quarterfinal Matchups")
             seeds = [(0,7), (3,4), (1,6), (2,5)]
             for i, (p1, p2) in enumerate(seeds):
                 with st.container(border=True):
