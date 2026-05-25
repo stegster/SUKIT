@@ -4,7 +4,7 @@ import pandas as pd
 import time
 
 # 1. Page Configuration
-st.set_page_config(page_title="SUKIT | Steger Ultimate Kubb Invitational", layout="wide", page_icon="🏆")
+st.set_page_config(page_title="SUKIT | Steger Ultimate Kubb Invitational Tournament", layout="wide", page_icon="🏆")
 
 # 2. Connection Setup
 conn = st.connection("gsheets", type=GSheetsConnection)
