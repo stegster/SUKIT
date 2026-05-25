@@ -35,8 +35,12 @@ def reset_tournament():
     st.rerun()
 
 # --- HEADER IMAGE ---
-# Using a raw GitHub link - the most stable way to host images for Streamlit apps
-st.image("https://raw.githubusercontent.com/fede-87/sukit/main/sukit_banner.jpg", use_container_width=True)
+# This now looks for the file inside your GitHub folder.
+# Ensure the file 'sukit_banner.jpg' is uploaded to your GitHub repo.
+try:
+    st.image("sukit_banner.jpg", use_container_width=True)
+except:
+    st.warning("⚠️ Banner image 'sukit_banner.jpg' not found in GitHub folder.")
 
 st.markdown("<h1 style='text-align: center; color: #4A2C2A;'>Steger Ultimate Kubb Invitational</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center; font-size: 22px; color: #6D4C41;'><i>Precision. Strategy. Wood.</i></p>", unsafe_allow_html=True)
