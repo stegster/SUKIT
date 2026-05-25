@@ -151,4 +151,13 @@ else:
     with tab3:
         p_rem = (prelims['Winner'] == "None").sum()
         if p_rem > 0:
-            st.warning(f
+            st.warning(f"Official seeding is locked. {p_rem} matches left.")
+            st.info("Current Projected Seeds: " + ", ".join(standings_df.head(8)['Team'].tolist()))
+        else:
+            st.balloons()
+            top_8 = standings_df.head(8)['Team'].tolist()
+            seeds = [(0,7), (3,4), (1,6), (2,5)]
+            for i, (p1, p2) in enumerate(seeds):
+                with st.container(border=True):
+                    st.write(f"**Quarterfinal Match {i+1}**")
+                    st.markdown(f"### {top_8[p1]} (Seed {p1+1}) vs {top_8[p2]} (Seed {p2+1})")
