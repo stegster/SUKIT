@@ -42,9 +42,9 @@ col_l, col_mid, col_r = st.columns([1, 2, 1])
 with col_mid:
     try:
         # Looks for the new thin banner in your GitHub repo
-        st.image("sukit_banner.jpg", use_container_width=True)
+        st.image("sukit_banner.png", use_container_width=True)
     except:
-        st.info("ℹ️ Upload 'sukit_banner.jpg' to GitHub to see your custom banner here.")
+        st.info("ℹ️ Upload 'sukit_banner.png' to GitHub to see your custom banner here.")
 
 # Title and Subtitle centered below the image
 st.markdown("<h1 style='text-align: center; color: #4A2C2A; margin-top: -10px;'>Steger Ultimate Kubb Invitational</h1>", unsafe_allow_html=True)
