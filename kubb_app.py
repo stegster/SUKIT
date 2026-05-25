@@ -38,7 +38,7 @@ def reset_tournament():
 # This now looks for the file inside your GitHub folder.
 # Ensure the file 'sukit_banner.jpg' is uploaded to your GitHub repo.
 try:
-    st.image("sukit_banner.jpg", use_container_width=True)
+    st.image("sukit_banner.png", use_container_width=True)
 except:
     st.warning("⚠️ Banner image 'sukit_banner.jpg' not found in GitHub folder.")
 
