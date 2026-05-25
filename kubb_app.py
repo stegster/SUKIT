@@ -34,13 +34,9 @@ def reset_tournament():
     st.session_state.tournament_active = False
     st.rerun()
 
-# --- HEADER SECTION ---
-# Using a high-quality fallback URL + styled header to ensure branding is always visible
-banner_url = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/tms-hms/tm-normal.png" # Placeholder if local fail
-# Note: Since I cannot physically upload a file to your local machine, 
-# I am using a reliable GitHub-hosted raw link that is allowed by Streamlit.
-
-st.image("https://i.ibb.co/LhbM9Yn/sukit-banner-final.jpg", use_container_width=True)
+# --- HEADER IMAGE ---
+# Using a raw GitHub link - the most stable way to host images for Streamlit apps
+st.image("https://raw.githubusercontent.com/fede-87/sukit/main/sukit_banner.jpg", use_container_width=True)
 
 st.markdown("<h1 style='text-align: center; color: #4A2C2A;'>Steger Ultimate Kubb Invitational</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center; font-size: 22px; color: #6D4C41;'><i>Precision. Strategy. Wood.</i></p>", unsafe_allow_html=True)
