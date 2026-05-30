@@ -56,7 +56,7 @@ st.markdown("""
 
     /* LIGHT MODE: Dark Wood / Burnt Charcoal */
     @media (prefers-color-scheme: light) {
-        .hero-text { color: #4A2C2A; }
+        .hero-text { color: #78592B; }
         .hero-subtext { color: #6D4C41; }
     }
     
