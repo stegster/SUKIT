@@ -87,12 +87,24 @@ if "tournament_active" not in st.session_state:
 
 df = get_data()
 
-if not df.empty and "Team A" in df.columns:
+# Check if the dataframe is valid and has the required columns
+required_columns = ["Type", "Game", "Team A", "Team B", "Winner"]
+columns_present = all(col in df.columns for col in required_columns)
+
+if not df.empty and columns_present:
     st.session_state.tournament_active = True
+else:
+    # If columns are missing, we force the setup phase
+    st.session_state.tournament_active = False
 
 # --- 7. SETUP PHASE ---
 if not st.session_state.tournament_active:
     st.subheader("🔥 Start a New Session")
+    
+    # Validation message if the sheet exists but is formatted wrong
+    if not df.empty and not columns_present:
+        st.warning("⚠️ Connected sheet is missing SUKIT columns. Clicking 'Generate' will reset the headers.")
+
     team_input = st.text_area("Enter Team Names (one per line):", height=200)
     
     if st.button("Generate Schedule", type="primary"):
@@ -108,7 +120,10 @@ if not st.session_state.tournament_active:
                     if ta != "BYE" and tb != "BYE":
                         matches.append({"Type": "Prelim", "Game": str(len(matches) + 1), "Team A": ta, "Team B": tb, "Winner": "None"})
                 t_list = [t_list[0]] + [t_list[-1]] + t_list[1:-1]
-            update_sheet(pd.DataFrame(matches))
+            
+            # This creates the correct headers automatically
+            new_df = pd.DataFrame(matches, columns=required_columns)
+            update_sheet(new_df)
             st.session_state.tournament_active = True
             st.rerun()
 
