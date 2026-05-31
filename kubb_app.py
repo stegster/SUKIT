@@ -166,48 +166,79 @@ with tab3:
         if p_rem > 0:
             st.warning(f"Complete {p_rem} more matches to lock the bracket.")
         else:
-            st.balloons()
-            st.success("🏆 Championship Bracket Official")
+            # 1. ORGANIZE BRACKET DATA
+            # We filter for bracket types to keep everyone synced
+            bracket_df = df[df['Type'].isin(['QF', 'SF', 'Final'])]
             
-            # 1. PREP THE SEEDS
-            top_8 = standings_df.head(8)['Team'].tolist()
-            
-            # 2. QUARTERFINALS (Static Selection)
-            st.markdown("### ⚔️ Quarterfinals")
-            col1, col2 = st.columns(2)
-            
-            # Using selectboxes ensures the winner "sticks" across refreshes
-            with col1:
-                q1_win = st.selectbox(f"Match 1: {top_8[0]} vs {top_8[7]}", ["-", top_8[0], top_8[7]], index=0)
-                q2_win = st.selectbox(f"Match 2: {top_8[3]} vs {top_8[4]}", ["-", top_8[3], top_8[4]], index=0)
-            with col2:
-                q3_win = st.selectbox(f"Match 3: {top_8[1]} vs {top_8[6]}", ["-", top_8[1], top_8[6]], index=0)
-                q4_win = st.selectbox(f"Match 4: {top_8[2]} vs {top_8[5]}", ["-", top_8[2], top_8[5]], index=0)
-
-            st.divider()
-
-            # 3. SEMIFINALS (Logic based on QF winners)
-            if all(x != "-" for x in [q1_win, q2_win, q3_win, q4_win]):
-                st.markdown("### 🛡️ Semifinals")
-                s_col1, s_col2 = st.columns(2)
-                with s_col1:
-                    s1_win = st.selectbox(f"Semi 1: {q1_win} vs {q2_win}", ["-", q1_win, q2_win])
-                with s_col2:
-                    s2_win = st.selectbox(f"Semi 2: {q3_win} vs {q4_win}", ["-", q3_win, q4_win])
-                
-                st.divider()
-
-                # 4. THE FINALS
-                if s1_win != "-" and s2_win != "-":
-                    st.markdown("### 👑 THE SUKIT FINALS")
-                    final_win = st.radio(f"Who is the Ultimate Champion?", [s1_win, s2_win], index=None, horizontal=True)
+            # If the bracket hasn't been created in the Sheet yet, let's build it
+            if bracket_df.empty:
+                if st.button("🏁 Initialize Official Bracket"):
+                    top_8 = standings_df.head(8)['Team'].tolist()
+                    seeds = [(0,7, "QF1"), (3,4, "QF2"), (1,6, "QF3"), (2,5, "QF4")]
+                    new_matches = []
+                    for p1, p2, label in seeds:
+                        new_matches.append({"Type": "QF", "Game": label, "Team A": top_8[p1], "Team B": top_8[p2], "Winner": "None"})
                     
-                    if final_win:
-                        st.snow()
-                        st.confetti = True # Visual flair
-                        st.markdown(f"""
-                            <div style="text-align: center; padding: 20px; border: 5px solid #D7B594; border-radius: 10px;">
-                                <h1 style="font-size: 50px;">🏆 {final_win} 🏆</h1>
-                                <h2>2026 SUKIT CHAMPIONS</h2>
-                            </div>
-                        """, unsafe_allow_html=True)
+                    # Add placeholders for SF and Finals
+                    new_matches.append({"Type": "SF", "Game": "SF1", "Team A": "TBD", "Team B": "TBD", "Winner": "None"})
+                    new_matches.append({"Type": "SF", "Game": "SF2", "Team A": "TBD", "Team B": "TBD", "Winner": "None"})
+                    new_matches.append({"Type": "Final", "Game": "Championship", "Team A": "TBD", "Team B": "TBD", "Winner": "None"})
+                    
+                    updated_df = pd.concat([df, pd.DataFrame(new_matches)], ignore_index=True)
+                    update_sheet(updated_df)
+                    st.rerun()
+            else:
+                # 2. DYNAMIC BRACKET LOGIC (Updates TBDs automatically)
+                # This ensures Team A/B in the SF matches update as soon as QF winners are picked
+                qf_winners = bracket_df[bracket_df['Type'] == 'QF']['Winner'].tolist()
+                
+                # Logic to "Push" winners to the next round
+                changed = False
+                if qf_winners[0] != "None" and qf_winners[1] != "None":
+                    if df.loc[df['Game'] == 'SF1', 'Team A'].values[0] != qf_winners[0] or df.loc[df['Game'] == 'SF1', 'Team B'].values[0] != qf_winners[1]:
+                        df.loc[df['Game'] == 'SF1', 'Team A'] = qf_winners[0]
+                        df.loc[df['Game'] == 'SF1', 'Team B'] = qf_winners[1]
+                        changed = True
+
+                if qf_winners[2] != "None" and qf_winners[3] != "None":
+                    if df.loc[df['Game'] == 'SF2', 'Team A'].values[0] != qf_winners[2] or df.loc[df['Game'] == 'SF2', 'Team B'].values[0] != qf_winners[3]:
+                        df.loc[df['Game'] == 'SF2', 'Team A'] = qf_winners[2]
+                        df.loc[df['Game'] == 'SF2', 'Team B'] = qf_winners[3]
+                        changed = True
+                
+                # Final Push
+                sf_winners = df[df['Type'] == 'SF']['Winner'].tolist()
+                if all(w != "None" for w in sf_winners):
+                    if df.loc[df['Game'] == 'Championship', 'Team A'].values[0] != sf_winners[0] or df.loc[df['Game'] == 'Championship', 'Team B'].values[0] != sf_winners[1]:
+                        df.loc[df['Game'] == 'Championship', 'Team A'] = sf_winners[0]
+                        df.loc[df['Game'] == 'Championship', 'Team B'] = sf_winners[1]
+                        changed = True
+
+                if changed:
+                    update_sheet(df)
+                    st.rerun()
+
+                # 3. RENDER THE SYNCED BRACKET
+                for round_type in ['QF', 'SF', 'Final']:
+                    st.subheader(f"--- {round_type} ---")
+                    round_matches = df[df['Type'] == round_type]
+                    cols = st.columns(len(round_matches))
+                    for i, (idx, row) in enumerate(round_matches.iterrows()):
+                        with cols[i]:
+                            ta, tb, w = row['Team A'], row['Team B'], row['Winner']
+                            if ta == "TBD":
+                                st.info("Waiting for previous round...")
+                            else:
+                                if st.button(f"{ta}", key=f"btn_a_{idx}", use_container_width=True, type="primary" if w == ta else "secondary"):
+                                    df.at[idx, 'Winner'] = ta
+                                    update_sheet(df); st.rerun()
+                                st.write("vs")
+                                if st.button(f"{tb}", key=f"btn_b_{idx}", use_container_width=True, type="primary" if w == tb else "secondary"):
+                                    df.at[idx, 'Winner'] = tb
+                                    update_sheet(df); st.rerun()
+                
+                # Check for ultimate champion
+                champ = df[df['Type'] == 'Final']['Winner'].values[0]
+                if champ != "None":
+                    st.balloons()
+                    st.markdown(f"<h1 style='text-align:center;'>🏆 {champ} 🏆</h1>", unsafe_allow_html=True)
