@@ -140,34 +140,30 @@ else:
                     new_m.append({"Type": "Final", "Game": "Final", "Team A": "TBD", "Team B": "TBD", "Winner": "None"})
                     update_sheet(pd.concat([df, pd.DataFrame(new_m)], ignore_index=True))
                     st.rerun()
-else:
-                # --- SYNC LOGIC (Updated to prevent IndexError) ---
+            else:
+                # --- SYNC LOGIC (With Safety Checks) ---
                 changed = False
                 qf_w = df[df['Type'] == 'QF']['Winner'].tolist()
                 sf_w = df[df['Type'] == 'SF']['Winner'].tolist()
                 
-                # Update SF teams from QF winners (Safely check if SF matches exist)
-                if len(qf_w) >= 4 and qf_w[0] != "None" and qf_w[1] != "None":
-                    if 'SF1' in df['Game'].values:
-                        if df.loc[df['Game']=='SF1', 'Team A'].values[0] != qf_w[0]: df.loc[df['Game']=='SF1', 'Team A'] = qf_w[0]; changed = True
-                        if df.loc[df['Game']=='SF1', 'Team B'].values[0] != qf_w[1]: df.loc[df['Game']=='SF1', 'Team B'] = qf_w[1]; changed = True
-                
-                if len(qf_w) >= 4 and qf_w[2] != "None" and qf_w[3] != "None":
-                    if 'SF2' in df['Game'].values:
-                        if df.loc[df['Game']=='SF2', 'Team A'].values[0] != qf_w[2]: df.loc[df['Game']=='SF2', 'Team A'] = qf_w[2]; changed = True
-                        if df.loc[df['Game']=='SF2', 'Team B'].values[0] != qf_w[3]: df.loc[df['Game']=='SF2', 'Team B'] = qf_w[3]; changed = True
+                # Check for SF existence and update from QF winners
+                if len(qf_w) >= 4:
+                    if qf_w[0] != "None" and qf_w[1] != "None":
+                        if 'SF1' in df['Game'].values:
+                            if df.loc[df['Game']=='SF1', 'Team A'].values[0] != qf_w[0]: df.loc[df['Game']=='SF1', 'Team A'] = qf_w[0]; changed = True
+                            if df.loc[df['Game']=='SF1', 'Team B'].values[0] != qf_w[1]: df.loc[df['Game']=='SF1', 'Team B'] = qf_w[1]; changed = True
+                    if qf_w[2] != "None" and qf_w[3] != "None":
+                        if 'SF2' in df['Game'].values:
+                            if df.loc[df['Game']=='SF2', 'Team A'].values[0] != qf_w[2]: df.loc[df['Game']=='SF2', 'Team A'] = qf_w[2]; changed = True
+                            if df.loc[df['Game']=='SF2', 'Team B'].values[0] != qf_w[3]: df.loc[df['Game']=='SF2', 'Team B'] = qf_w[3]; changed = True
 
-                # Update Final from SF winners
+                # Check for Final existence and update from SF winners
                 if len(sf_w) >= 2 and all(w != "None" for w in sf_w):
-                    # Check for either 'Final' or 'Championship' naming
-                    final_game_label = 'Final' if 'Final' in df['Game'].values else 'Championship'
-                    if final_game_label in df['Game'].values:
-                        if df.loc[df['Game']==final_game_label, 'Team A'].values[0] != sf_w[0]: df.loc[df['Game']==final_game_label, 'Team A'] = sf_w[0]; changed = True
-                        if df.loc[df['Game']==final_game_label, 'Team B'].values[0] != sf_w[1]: df.loc[df['Game']==final_game_label, 'Team B'] = sf_w[1]; changed = True
+                    if 'Final' in df['Game'].values:
+                        if df.loc[df['Game']=='Final', 'Team A'].values[0] != sf_w[0]: df.loc[df['Game']=='Final', 'Team A'] = sf_w[0]; changed = True
+                        if df.loc[df['Game']=='Final', 'Team B'].values[0] != sf_w[1]: df.loc[df['Game']=='Final', 'Team B'] = sf_w[1]; changed = True
                 
-                if changed: 
-                    update_sheet(df)
-                    st.rerun()
+                if changed: update_sheet(df); st.rerun()
 
                 # Display synced bracket
                 for r_type in ['QF', 'SF', 'Final']:
@@ -181,9 +177,14 @@ else:
                             else:
                                 if st.button(f"{ta}", key=f"b_a_{idx}", use_container_width=True, type="primary" if w==ta else "secondary"):
                                     df.at[idx, 'Winner'] = ta; update_sheet(df); st.rerun()
+                                st.write("vs")
                                 if st.button(f"{tb}", key=f"b_b_{idx}", use_container_width=True, type="primary" if w==tb else "secondary"):
                                     df.at[idx, 'Winner'] = tb; update_sheet(df); st.rerun()
                 
-                if df[df['Type'] == 'Final']['Winner'].values[0] != "None":
-                    st.balloons()
-                    st.success(f"CHAMPION: {df[df['Type'] == 'Final']['Winner'].values[0]}")
+                # Ultimate Champion Check
+                final_results = df[df['Type'] == 'Final']
+                if not final_results.empty:
+                    champ = final_results['Winner'].values[0]
+                    if champ != "None":
+                        st.balloons()
+                        st.success(f"CHAMPION: {champ}")
