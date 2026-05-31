@@ -161,23 +161,53 @@ else:
         st.table(standings_df)
 
     # --- 10. BRACKET (FIXED SEEDING LABELS) ---
-    with tab3:
+with tab3:
         p_rem = (prelims['Winner'] == "None").sum()
         if p_rem > 0:
             st.warning(f"Complete {p_rem} more matches to lock the bracket.")
         else:
-            st.balloons() 
-            st.success("🏆 Preliminary Rounds Complete! The King Has Fallen.")
+            st.balloons()
+            st.success("🏆 Championship Bracket Official")
             
+            # 1. PREP THE SEEDS
             top_8 = standings_df.head(8)['Team'].tolist()
-            # Pairs: (Seed 1 vs 8), (Seed 4 vs 5), (Seed 2 vs 7), (Seed 3 vs 6)
-            seeds = [(0,7), (3,4), (1,6), (2,5)]
             
-            st.subheader("Championship Bracket")
-            for i, (p1, p2) in enumerate(seeds):
-                with st.container(border=True):
-                    st.write(f"**Quarterfinal Match {i+1}**")
-                    # Dynamically pull the seed rank based on index + 1
-                    t1_name, t1_seed = top_8[p1], p1 + 1
-                    t2_name, t2_seed = top_8[p2], p2 + 1
-                    st.markdown(f"### {t1_name} (Seed {t1_seed}) vs {t2_name} (Seed {t2_seed})")
+            # 2. QUARTERFINALS (Static Selection)
+            st.markdown("### ⚔️ Quarterfinals")
+            col1, col2 = st.columns(2)
+            
+            # Using selectboxes ensures the winner "sticks" across refreshes
+            with col1:
+                q1_win = st.selectbox(f"Match 1: {top_8[0]} vs {top_8[7]}", ["-", top_8[0], top_8[7]], index=0)
+                q2_win = st.selectbox(f"Match 2: {top_8[3]} vs {top_8[4]}", ["-", top_8[3], top_8[4]], index=0)
+            with col2:
+                q3_win = st.selectbox(f"Match 3: {top_8[1]} vs {top_8[6]}", ["-", top_8[1], top_8[6]], index=0)
+                q4_win = st.selectbox(f"Match 4: {top_8[2]} vs {top_8[5]}", ["-", top_8[2], top_8[5]], index=0)
+
+            st.divider()
+
+            # 3. SEMIFINALS (Logic based on QF winners)
+            if all(x != "-" for x in [q1_win, q2_win, q3_win, q4_win]):
+                st.markdown("### 🛡️ Semifinals")
+                s_col1, s_col2 = st.columns(2)
+                with s_col1:
+                    s1_win = st.selectbox(f"Semi 1: {q1_win} vs {q2_win}", ["-", q1_win, q2_win])
+                with s_col2:
+                    s2_win = st.selectbox(f"Semi 2: {q3_win} vs {q4_win}", ["-", q3_win, q4_win])
+                
+                st.divider()
+
+                # 4. THE FINALS
+                if s1_win != "-" and s2_win != "-":
+                    st.markdown("### 👑 THE SUKIT FINALS")
+                    final_win = st.radio(f"Who is the Ultimate Champion?", [s1_win, s2_win], index=None, horizontal=True)
+                    
+                    if final_win:
+                        st.snow()
+                        st.confetti = True # Visual flair
+                        st.markdown(f"""
+                            <div style="text-align: center; padding: 20px; border: 5px solid #D7B594; border-radius: 10px;">
+                                <h1 style="font-size: 50px;">🏆 {final_win} 🏆</h1>
+                                <h2>2026 SUKIT CHAMPIONS</h2>
+                            </div>
+                        """, unsafe_allow_html=True)
